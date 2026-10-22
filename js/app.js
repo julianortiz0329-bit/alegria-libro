@@ -2,13 +2,14 @@
 // guarda lo de Alegría y lo comparte en la nube entre los socios.
 import { localDate, periodLabel } from './core/dates.js';
 import { parsePesos } from './core/money.js';
-import { accountBalances, ensureAccounts, EXPENSE_CATEGORIES, journal, monthResult, partnerBalances, voidMovement } from './domain/ledger.js';
-import { completeSupplierFollowUp, importShopifyOrders, loadPetHomeCatalog, saleTotals, setPhCost, updatePhProfile, voidPhPayment, voidPhSale } from './domain/pethome.js';
+import { accountBalances, ensureAccounts, EXPENSE_CATEGORIES, ivaReport, journal, monthResult, partnerBalances, voidMovement } from './domain/ledger.js';
+import { completeSupplierFollowUp, importShopifyOrders, importShopifyProducts, loadPetHomeCatalog, saleTotals, setPhCost, updatePhProfile, voidPhPayment, voidPhSale, voidPurchase, voidPurchasePayment } from './domain/pethome.js';
 import { normalizePhone } from './domain/whatsapp.js';
 import { getState, login, logout, openCached, renameMe, startAutoSync, subscribe, sync, syncNow } from './store/store.js';
 import { $, $$, confirmDialog, download, esc, exec, haptic, money, openModal, toast } from './ui/dom.js';
 import { accountForm, contributionForm, expenseForm, showReceipt, transferForm, withdrawalForm } from './ui/forms-ledger.js';
-import { phNoteForm, phPaymentForm, phProductForm, phPurchaseForm, phPurchasePayForm, phSaleForm, phSupplierForm } from './ui/forms-pethome.js';
+import { phNoteForm, phPaymentForm, phProductForm, phPurchaseDueForm, phPurchaseForm, phPurchasePayForm, phSaleForm, phSupplierForm } from './ui/forms-pethome.js';
+import { renderCompra, renderPagar } from './ui/views-payables.js';
 import { icon } from './ui/icons.js';
 import { bindRipple, bindTilt, bounce, odometer, paintGrain, setSections, swapScreen, syncNavPill } from './ui/motion.js';
 import { chargeAccountPdf, monthReportPdf, paymentReceiptPdf } from './ui/pdf-pethome.js';
@@ -17,7 +18,7 @@ import { navigate, route, savePrefs, ui } from './ui/state.js';
 import { renderCaja, renderLibro, renderMas, renderResumen, renderSocios, syncBadge } from './ui/views-ledger.js';
 import { phLogo, phProductQuery, phProductRows, renderPhProducts, renderPhProfile, renderPhSale, renderPhSales, renderPhSupplier, renderPhSuppliers } from './ui/views-pethome.js';
 
-export const VERSION = '1.0.0';
+export const VERSION = '1.2.0';
 globalThis.ALEGRIA_VERSION = VERSION;
 const S = () => getState();
 const PH = () => S().pethome;
@@ -34,13 +35,14 @@ const FAB = [
   ['ph-new-sale', 'receipt', 'Venta'],
   ['new-expense', 'cash', 'Gasto'],
   ['ph-new-purchase', 'package', 'Compra a proveedor'],
+  ['go-pagar', 'calendar', 'Abonar a una factura'],
   ['new-contribution', 'plus', 'Aporte de socio'],
   ['new-withdrawal', 'wallet', 'Retiro de socio'],
   ['new-transfer', 'refresh', 'Traslado entre cuentas'],
   ['ph-note', 'message', 'Conversación con proveedor'],
 ];
 const NAV_ORDER = NAV.map((x) => x[0]);
-const SECTION = { 'ph-venta': 'ph-ventas', 'ph-proveedores': 'mas', 'ph-proveedor': 'mas', 'ph-productos': 'mas', 'ph-perfil': 'mas' };
+const SECTION = { pagar: 'caja', compra: 'caja', 'ph-venta': 'ph-ventas', 'ph-proveedores': 'mas', 'ph-proveedor': 'mas', 'ph-productos': 'mas', 'ph-perfil': 'mas' };
 
 /* ---------------- Pintar ---------------- */
 let lastKey = '';
@@ -70,6 +72,8 @@ async function render() {
       case 'ph-perfil': html = renderPhProfile(); break;
       case 'libro': html = renderLibro(r.params); break;
       case 'caja': html = renderCaja(); break;
+      case 'pagar': html = renderPagar(r.params); break;
+      case 'compra': html = renderCompra(r.id); break;
       case 'socios': html = renderSocios(); break;
       case 'mas': html = renderMas(); break;
       default: html = renderResumen(r.params);
@@ -271,7 +275,7 @@ const handlers = {
   async 'month-pdf'(el) {
     const p = el.dataset.p || localDate().slice(0, 7);
     try {
-      await sharePhPdf(monthReportPdf(S(), p, { monthResult, partnerBalances, accountBalances, journal, EXPENSE_CATEGORIES, periodLabel }), `Alegría ${periodLabel(p)}.pdf`, `Informe ${periodLabel(p)}`);
+      await sharePhPdf(monthReportPdf(S(), p, { monthResult, partnerBalances, accountBalances, journal, EXPENSE_CATEGORIES, periodLabel, ivaReport }), `Alegría ${periodLabel(p)}.pdf`, `Informe ${periodLabel(p)}`);
     } catch (e) {
       toast(`No se pudo crear el PDF: ${e.message}`, 'error');
     }
@@ -354,6 +358,16 @@ const handlers = {
     phPurchaseForm(el.dataset.id || (route().name === 'ph-proveedor' ? route().id : null));
   },
   'ph-purchase-pay': (el) => phPurchasePayForm(el.dataset.id),
+  'go-pagar': () => navigate('#/pagar'),
+  'purchase-due': (el) => phPurchaseDueForm(el.dataset.id),
+  async 'void-purchase-pay'(el) {
+    const reason = await confirmDialog({ title: 'Anular abono', message: 'El abono queda anulado con su motivo (no se borra), el saldo vuelve a quedar pendiente y la plata regresa a la cuenta.', reason: true, confirmText: 'Anular abono', danger: true });
+    if (reason) await exec(voidPurchasePayment, { purchaseId: el.dataset.id, paymentId: el.dataset.pay, reason }, { success: 'Abono anulado' }).catch(() => {});
+  },
+  async 'void-purchase'(el) {
+    const reason = await confirmDialog({ title: 'Anular compra', message: 'La compra queda anulada con su motivo y deja de aparecer en las facturas por pagar.', reason: true, confirmText: 'Anular compra', danger: true });
+    if (reason) await exec(voidPurchase, { purchaseId: el.dataset.id, reason }, { success: 'Compra anulada' }).catch(() => {});
+  },
   'ph-new-product': () => phProductForm(),
   'ph-edit-product': (el) => phProductForm(PH().products.find((x) => x.id === el.dataset.id)),
   'ph-logo-shopify': () => logoFromShopify(),
@@ -411,6 +425,17 @@ document.addEventListener('change', async (e) => {
     }
     return;
   }
+  if (t.matches('[data-ph-products-csv]') && t.files?.[0]) {
+    const file = t.files[0];
+    t.value = '';
+    try {
+      const r = await exec(importShopifyProducts, { text: await file.text(), updatePrices: !!$('#ph-csv-prices')?.checked });
+      if (r) openModal({ title: 'Productos de Shopify', body: `<p><b>${r.added.length}</b> producto(s) nuevo(s)${r.priced.length ? ` · <b>${r.priced.length}</b> precio(s) actualizado(s)` : ''} · ${r.same} sin cambios${r.archived ? ` · ${r.archived} archivado(s) en Shopify (no se cargan)` : ''}.</p>${r.added.length ? `<p class="small">Nuevos: ${esc(r.added.join(', '))}</p><div class="notice info">Ponles el costo en Productos → Sin costo para ver su margen.</div>` : ''}${r.priced.length ? `<details><summary>Precios que cambiaron</summary><p class="small">${esc(r.priced.join(' · '))}</p></details>` : ''}`, cancelText: 'Cerrar' });
+    } catch {
+      /* exec ya mostró el error */
+    }
+    return;
+  }
   if (t.matches('[data-ph-import]') && t.files?.[0]) {
     const file = t.files[0];
     t.value = '';
@@ -438,7 +463,7 @@ document.addEventListener('submit', async (e) => {
   e.preventDefault();
   const fd = new FormData(f);
   if (f.dataset.form === 'ph-profile') {
-    await exec(updatePhProfile, Object.fromEntries(['brand', 'issuerName', 'issuerId', 'phone', 'email', 'city', 'web', 'payInfo', 'taxNote', 'minMarginPct'].map((k) => [k, fd.get(k)])), { success: 'Datos guardados' }).catch(() => {});
+    await exec(updatePhProfile, { ...Object.fromEntries(['brand', 'issuerName', 'issuerId', 'phone', 'email', 'city', 'web', 'payInfo', 'taxNote', 'minMarginPct', 'ivaPeriod'].map((k) => [k, fd.get(k)])), ivaResponsable: !!fd.get('ivaResponsable') }, { success: 'Datos guardados' }).catch(() => {});
   } else if (f.dataset.form === 'rename') {
     try {
       await renameMe(fd.get('nombre'));

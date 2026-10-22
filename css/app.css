@@ -1201,3 +1201,30 @@ details.acc > ul, details.acc > p { padding: 4px 16px 12px; margin: 0; }
 .receipt-thumb { width: 44px; height: 44px; object-fit: cover; border-radius: 8px; vertical-align: middle; margin-right: 6px; }
 .receipt-full { display: block; width: 100%; height: auto; border-radius: 12px; }
 #lock .login > p.lk-msg { margin: 0; letter-spacing: 0; text-transform: none; font-size: 13.5px; font-weight: 600; color: #ffcfc7; }
+
+/* Facturas por pagar (1.1) */
+.pay-alert { display: flex; align-items: center; gap: 12px; margin: 10px 0; padding: 12px 14px; border-radius: 16px; text-decoration: none; color: var(--fg); background: var(--surface); border: 1px solid var(--border); box-shadow: var(--shadow-card); }
+.pay-alert > span { display: grid; flex: 1; min-width: 0; }
+.pay-alert small { color: var(--fg-muted); }
+.pay-alert .ico:first-child { color: #b45309; }
+.pay-alert.late { background: color-mix(in srgb, #dc2626 9%, var(--surface)); border-color: color-mix(in srgb, #dc2626 40%, var(--border)); }
+.pay-alert.late .ico:first-child { color: #dc2626; }
+.bill-group { display: grid; gap: 8px; margin-top: 14px; }
+.bill-group h2 { font-size: 18px; margin: 0; display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+.bill-group h2 small { font-family: var(--font-sans); font-weight: 600; font-size: 13px; }
+.card.bill { border-left: 4px solid var(--border); }
+.card.bill.s-vencida, .card.bill.s-hoy { border-left-color: #dc2626; }
+.card.bill.s-pronto { border-left-color: #f59e0b; }
+.card.bill.s-al_dia { border-left-color: #16a34a; }
+.bill-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+.bill-nums { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 8px 0 6px; font-variant-numeric: tabular-nums; }
+.bill-nums span { display: grid; }
+.bill-nums small { color: var(--fg-muted); font-size: 11.5px; }
+.bill-nums .due b { color: var(--fg); font-size: 17px; }
+.bill-status { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 4px 0 10px; }
+.link.danger { color: #dc2626; }
+/* IVA por línea (1.2) */
+.ph-line.has-iva { grid-template-columns: minmax(0, 1fr) 64px 120px 82px 40px; }
+@media (max-width: 520px) { .ph-line.has-iva { grid-template-columns: repeat(3, minmax(0, 1fr)) 40px; } .ph-line.has-iva .ph-l-prod { grid-column: 1 / -1; } }
+.iva-card { display: grid; gap: 6px; }
+.iva-card .iva-due { font-family: var(--font-display); font-size: 24px; }

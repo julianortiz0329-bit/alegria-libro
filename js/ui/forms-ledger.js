@@ -58,6 +58,7 @@ export function expenseForm() {
       ${field({ name: 'category', label: 'Categoría', type: 'select', value: 'publicidad', options: opts(EXPENSE_CATEGORIES) })}
       ${field({ name: 'date', label: 'Fecha', type: 'date', value: localDate(), required: true })}
       ${field({ name: 'payer', label: '¿Con qué se pagó?', type: 'select', value: payers[0]?.value, options: payers, help: 'Si un socio lo pagó con su plata, queda a su favor en su cuenta de socio.' })}
+      ${field({ name: 'ivaPct', label: 'IVA incluido en el valor', type: 'select', value: '0', options: [{ value: '0', label: 'Sin IVA' }, { value: '5', label: '5 %' }, { value: '19', label: '19 %' }], help: S().pethome.profile.ivaResponsable ? 'Si la factura trae IVA, queda como IVA descontable.' : 'Como Alegría no cobra IVA, el gasto cuenta completo.' })}
       ${field({ name: 'notes', label: 'Nota (opcional)' })}
       <div class="field full"><label>Soporte (foto del recibo o factura)</label><label class="btn btn-plain btn-small file-btn">📷 Tomar o subir foto<input type="file" accept="image/*" data-receipt hidden></label><small data-receipt-info class="muted">Opcional.</small></div>
     </div>`,
@@ -86,7 +87,7 @@ export function expenseForm() {
           return false;
         }
       }
-      const r = await exec(addExpense, { description: fd.get('description'), amount: readMoney(fd, 'amount', { label: 'El valor' }), category: fd.get('category'), date: fd.get('date'), payer: fd.get('payer'), notes: fd.get('notes'), receiptId, requestId: rid }, { success: 'Gasto registrado' });
+      const r = await exec(addExpense, { description: fd.get('description'), amount: readMoney(fd, 'amount', { label: 'El valor' }), category: fd.get('category'), date: fd.get('date'), payer: fd.get('payer'), ivaPct: fd.get('ivaPct'), notes: fd.get('notes'), receiptId, requestId: rid }, { success: 'Gasto registrado' });
       return r ? undefined : false;
     },
   });

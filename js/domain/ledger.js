@@ -3,7 +3,7 @@
 // utilidad entre los socios. Montos en pesos enteros. Nada se borra: los
 // movimientos se anulan con motivo.
 import { newId } from '../core/ids.js';
-import { isValidDate, localDate, periodOf } from '../core/dates.js';
+import { addDays, diffDays, isValidDate, localDate, periodOf } from '../core/dates.js';
 import { parsePesos } from '../core/money.js';
 import { assert, audit, cleanText, getOrFail, nowOf } from './common.js';
 import { purchaseTotals, saleTotals } from './pethome.js';
@@ -86,6 +86,16 @@ export function saveAccount(s, input, ctx) {
 }
 
 /* ---------------- Gastos ---------------- */
+/** IVA incluido en un gasto (el valor registrado es lo que se pagó, con IVA). */
+export function expenseIva(e) {
+  const p = Number(e.ivaPct) || 0;
+  return p ? Math.round((e.amount * p) / (100 + p)) : 0;
+}
+/** Lo que el gasto le cuesta al negocio: sin IVA si Alegría lo puede descontar. */
+export function expenseCost(e, ivaResponsable) {
+  return ivaResponsable ? e.amount - expenseIva(e) : e.amount;
+}
+
 /** payer: id de una cuenta del negocio, o "socio:<id>" si lo pagó un socio de su bolsillo. */
 export function addExpense(s, input, ctx) {
   const l = L(s);
@@ -106,6 +116,7 @@ export function addExpense(s, input, ctx) {
     description,
     amount: peso(input.amount, 'El valor'),
     payer,
+    ivaPct: [0, 5, 19].includes(Number(input.ivaPct)) ? Number(input.ivaPct) : 0,
     receiptId: input.receiptId || null,
     notes: cleanText(input.notes, 600),
     status: 'activo',
@@ -187,13 +198,15 @@ export function monthResult(s, period = localDate().slice(0, 7)) {
   const l = L(s);
   const sales = st.sales.filter((x) => x.status === 'activa' && periodOf(x.date) === period);
   let revenue = 0;
+  let ivaSales = 0;
   let cogs = 0;
   let shippingCost = 0;
   let estimated = 0;
   let missing = 0;
   for (const x of sales) {
     const t = saleTotals(x);
-    revenue += t.total;
+    revenue += t.total - t.iva; // la venta sin IVA: el IVA es de la DIAN
+    ivaSales += t.iva;
     shippingCost += x.shippingCost || 0;
     for (const ln of x.lines) {
       const c = lineCost(st, ln);
@@ -204,12 +217,13 @@ export function monthResult(s, period = localDate().slice(0, 7)) {
   }
   const expenses = l.expenses.filter((x) => active(x) && periodOf(x.date) === period);
   const byCategory = {};
-  for (const e of expenses) byCategory[e.category] = (byCategory[e.category] || 0) + e.amount;
-  const expenseTotal = expenses.reduce((a, e) => a + e.amount, 0);
+  const resp = !!st.profile?.ivaResponsable;
+  for (const e of expenses) byCategory[e.category] = (byCategory[e.category] || 0) + expenseCost(e, resp);
+  const expenseTotal = expenses.reduce((a, e) => a + expenseCost(e, resp), 0);
   const gross = revenue - cogs - shippingCost;
   const profit = gross - expenseTotal;
   const shares = splitProfit(s.socios || [], profit);
-  return { period, salesCount: sales.length, revenue, cogs, shippingCost, gross, expenses: expenseTotal, byCategory, profit, shares, estimatedLines: estimated, missingCostLines: missing };
+  return { period, salesCount: sales.length, revenue, ivaSales, cogs, shippingCost, gross, expenses: expenseTotal, byCategory, profit, shares, estimatedLines: estimated, missingCostLines: missing };
 }
 
 /** Reparte en pesos enteros según el porcentaje de cada socio (el residuo va al primero). */
@@ -310,4 +324,108 @@ export function summaryRecords(s) {
   const bal = partnerBalances(s);
   recs.push({ id: 'resumen:saldos', tipo: 'resumen', datos: { saldos: Object.fromEntries(Object.entries(bal).map(([id, v]) => [id, v.balance])) } });
   return recs;
+}
+
+/* ---------------- Facturas por pagar (compras a crédito) ---------------- */
+const termDays = (txt) => {
+  const m = String(txt || '').match(/(\d{1,3})\s*d[ií]as?/i);
+  return m ? Number(m[1]) : null;
+};
+/** Plazo de pago del proveedor en días, leído de sus términos ("30 días"). */
+export function supplierTermDays(supplier) {
+  return termDays(supplier?.terms?.paymentTerm) ?? termDays(supplier?.terms?.credit);
+}
+
+/**
+ * Compras con saldo pendiente: cuánto falta, cuándo vence y cuántos días
+ * quedan (negativo = vencida). Ordenadas: vencidas primero, luego por fecha.
+ */
+export function payables(s, today = localDate()) {
+  const st = s.pethome;
+  const out = [];
+  for (const pu of st.purchases) {
+    if (pu.status !== 'activa') continue;
+    const t = purchaseTotals(pu);
+    if (t.balance <= 0) continue;
+    const days = pu.dueDate ? diffDays(today, pu.dueDate) : null;
+    const state = days === null ? 'sin_fecha' : days < 0 ? 'vencida' : days === 0 ? 'hoy' : days <= 7 ? 'pronto' : 'al_dia';
+    out.push({ pu, supplier: st.suppliers.find((x) => x.id === pu.supplierId) || null, ...t, days, state, pays: (pu.payments || []).filter((p) => p.status === 'activo') });
+  }
+  const rank = { vencida: 0, hoy: 1, pronto: 2, al_dia: 3, sin_fecha: 4 };
+  return out.sort((a, b) => rank[a.state] - rank[b.state] || (a.days ?? 9999) - (b.days ?? 9999) || a.pu.date.localeCompare(b.pu.date));
+}
+
+export function payablesSummary(s, today = localDate()) {
+  const list = payables(s, today);
+  const sumOf = (f) => list.filter(f).reduce((a, x) => a + x.balance, 0);
+  const bySupplier = new Map();
+  for (const x of list) {
+    const k = x.pu.supplierId;
+    const cur = bySupplier.get(k) || { supplier: x.supplier, balance: 0, count: 0, overdue: 0, next: null };
+    cur.balance += x.balance;
+    cur.count++;
+    if (x.state === 'vencida') cur.overdue += x.balance;
+    if (x.pu.dueDate && (!cur.next || x.pu.dueDate < cur.next)) cur.next = x.pu.dueDate;
+    bySupplier.set(k, cur);
+  }
+  // Abonos a proveedores hechos en los últimos 60 días.
+  const since = addDays(today, -60);
+  const recent = [];
+  for (const pu of s.pethome.purchases) for (const p of pu.payments || []) if (p.date >= since) recent.push({ pu, p, supplier: s.pethome.suppliers.find((x) => x.id === pu.supplierId) });
+  recent.sort((a, b) => b.p.date.localeCompare(a.p.date) || String(b.p.createdAt).localeCompare(String(a.p.createdAt)));
+  return {
+    list,
+    total: sumOf(() => true),
+    overdue: sumOf((x) => x.state === 'vencida'),
+    week: sumOf((x) => x.state === 'hoy' || x.state === 'pronto'),
+    count: list.length,
+    overdueCount: list.filter((x) => x.state === 'vencida').length,
+    soonCount: list.filter((x) => x.state === 'hoy' || x.state === 'pronto').length,
+    bySupplier: [...bySupplier.values()].sort((a, b) => b.balance - a.balance),
+    recent,
+  };
+}
+
+/* ---------------- IVA ---------------- */
+/** Periodos de declaración: bimestres (ene-feb…) o cuatrimestres (ene-abr, may-ago, sep-dic). */
+export function ivaPeriodOf(date, kind = 'cuatrimestral') {
+  const y = date.slice(0, 4);
+  const m = Number(date.slice(5, 7));
+  const size = kind === 'bimestral' ? 2 : 4;
+  const n = Math.floor((m - 1) / size);
+  const first = n * size + 1;
+  return { key: `${y}-${kind === 'bimestral' ? 'B' : 'C'}${n + 1}`, from: `${y}-${String(first).padStart(2, '0')}-01`, to: `${y}-${String(first + size - 1).padStart(2, '0')}-31`, months: Array.from({ length: size }, (_, i) => first + i) };
+}
+
+/**
+ * IVA del periodo: el que se cobró en ventas (generado) menos el que se pagó
+ * en compras y gastos (descontable) = lo que habría que pagarle a la DIAN.
+ * Solo aplica si Alegría es responsable de IVA.
+ */
+export function ivaReport(s, date = localDate()) {
+  const st = s.pethome;
+  const l = L(s);
+  const per = ivaPeriodOf(date, st.profile?.ivaPeriod);
+  const inP = (d) => d >= per.from && d <= per.to;
+  let generated = 0;
+  const genByRate = {};
+  for (const x of st.sales) {
+    if (x.status !== 'activa' || !inP(x.date)) continue;
+    const t = saleTotals(x);
+    generated += t.iva;
+    const sub = t.subtotal || 1;
+    for (const ln of x.lines) {
+      const p = Number(ln.ivaPct) || 0;
+      if (!p) continue;
+      const g = Math.round(ln.unitPrice * ln.qty);
+      const after = g - Math.round(((x.discount || 0) * g) / sub);
+      genByRate[p] = (genByRate[p] || 0) + Math.round((after * p) / (100 + p));
+    }
+  }
+  let fromPurchases = 0;
+  for (const pu of st.purchases) if (pu.status === 'activa' && inP(pu.date)) fromPurchases += purchaseTotals(pu).iva;
+  let fromExpenses = 0;
+  for (const e of l.expenses) if (active(e) && inP(e.date)) fromExpenses += expenseIva(e);
+  const deductible = fromPurchases + fromExpenses;
+  return { ...per, kind: st.profile?.ivaPeriod || 'cuatrimestral', generated, genByRate, fromPurchases, fromExpenses, deductible, balance: generated - deductible };
 }

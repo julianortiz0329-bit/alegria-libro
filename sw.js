@@ -1,7 +1,7 @@
 // Service worker: la app abre sin internet. RED PRIMERO para que cada
 // actualización llegue de inmediato; si no hay conexión se usa la copia
 // guardada. Los datos del libro viven en IndexedDB y en la nube (no aquí).
-const VERSION = 'alegria-v1.0.0';
+const VERSION = 'alegria-v1.2.0';
 const ASSETS = [
   './',
   './index.html',
@@ -23,6 +23,7 @@ const ASSETS = [
   './js/ui/pdf-pethome.js',
   './js/ui/state.js',
   './js/ui/views-ledger.js',
+  './js/ui/views-payables.js',
   './js/ui/views-pethome.js',
   './js/store/remote.js',
   './js/store/store.js',

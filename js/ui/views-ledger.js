@@ -1,7 +1,7 @@
 // Pantallas del libro de socios: resumen del mes con el reparto, libro de
 // movimientos, caja y bancos, cuenta de cada socio y "Más".
 import { addDays, formatDate, formatDateTime, localDate, periodLabel, previousPeriod } from '../core/dates.js';
-import { ACCOUNT_KINDS, accountBalances, CONTRIBUTION_KINDS, EXPENSE_CATEGORIES, journal, monthResult, partnerBalances, WITHDRAWAL_KINDS } from '../domain/ledger.js';
+import { ACCOUNT_KINDS, accountBalances, CONTRIBUTION_KINDS, EXPENSE_CATEGORIES, ivaReport, journal, monthResult, partnerBalances, payablesSummary, WITHDRAWAL_KINDS } from '../domain/ledger.js';
 import { PH_CHANNELS, phMonthSummary } from '../domain/pethome.js';
 import { getState, sync } from '../store/store.js';
 import { empty, esc, money, pill, stat } from './dom.js';
@@ -45,7 +45,7 @@ export function renderResumen(params) {
   if (!st.products.length && !st.sales.length && !L().expenses.length) {
     return `${head('Libro de socios', 'Alegría Pet Home')}
     <section class="panel ph-welcome"><h2>¡Bienvenido, ${esc(S().me.nombre)}!</h2><p>Este es el libro de Alegría que comparten los socios: lo que uno registra, el otro lo ve.</p>
-    <ol class="ph-steps"><li><b>Carga los productos</b> de la tienda Shopify (69 productos con su precio).</li><li><b>Revisa las cuentas</b> (Efectivo, Nequi, Bancolombia) en Caja y pon su saldo inicial.</li><li><b>Registra</b> ventas, gastos y aportes con el botón <b>+</b>.</li></ol>
+    <ol class="ph-steps"><li><b>Carga los productos</b> de la tienda Shopify (77 productos con su precio).</li><li><b>Revisa las cuentas</b> (Efectivo, Nequi, Bancolombia) en Caja y pon su saldo inicial.</li><li><b>Registra</b> ventas, gastos y aportes con el botón <b>+</b>.</li></ol>
     <div class="row-gap"><button class="btn btn-primary" data-act="ph-load-catalog">${icon('package', { size: 18 })} Cargar productos de Shopify</button><a class="btn btn-plain" href="#/caja">Ver cuentas</a></div></section>`;
   }
   const r = monthResult(S(), period);
@@ -53,17 +53,20 @@ export function renderResumen(params) {
   const cash = accountBalances(S());
   const bal = partnerBalances(S());
   const follow = st.notes.filter((n) => n.followUp && !n.done && n.followUp <= addDays(today, 7)).sort((a, b) => a.followUp.localeCompare(b.followUp)).slice(0, 4);
+  const pay = payablesSummary(S());
+  const payAlert = pay.overdueCount || pay.soonCount ? `<a class="pay-alert ${pay.overdueCount ? 'late' : ''}" href="#/pagar">${icon('calendar', { size: 18 })}<span><b>${pay.overdueCount ? `${pay.overdueCount} factura(s) vencida(s) · ${money(pay.overdue)}` : `${pay.soonCount} factura(s) vencen esta semana · ${money(pay.week)}`}</b><small>Toca para ver las facturas por pagar y abonar</small></span>${icon('arrowRight', { size: 16 })}</a>` : '';
   const shares = S().socios.map((so) => `<span class="share-chip${so.id === S().me.id ? ' me' : ''}">${esc(so.nombre)} <b>${money(r.shares[so.id] || 0)}</b></span>`).join('');
   const cats = Object.entries(r.byCategory).sort((a, b) => b[1] - a[1]);
   return `${head(periodLabel(period), 'Alegría Pet Home', syncBadge())}
   ${monthNav('ph', period)}
+  ${payAlert}
   <section class="hero ph-hero">${heroDeco()}<div class="hero-top"><div><div class="hero-label">${r.profit < 0 ? 'Pérdida' : 'Utilidad'} de ${esc(mon(period))}</div><div class="hero-amount" data-count="${r.profit}">${money(r.profit)}</div>
     <div class="hero-sub">Vendieron <b>${money(r.revenue)}</b> en ${r.salesCount} venta(s) · gastos <b>${money(r.expenses)}</b></div></div></div>
     <div class="hero-foot shares">${shares}</div>
     ${r.missingCostLines ? `<div class="hero-foot"><a class="hero-chip" href="#/ph-productos?f=sincosto">${icon('alert', { size: 14 })} ${r.missingCostLines} producto(s) vendido(s) sin costo: la utilidad sale más alta de lo real</a></div>` : ''}</section>
   <section class="panel pnl"><div class="panel-head"><h2>Estado de resultados</h2><button class="btn btn-plain btn-small" data-act="month-pdf" data-p="${period}">${icon('file', { size: 16 })} PDF del mes</button></div>
     <ul class="pnl-rows">
-      <li><span>Ventas</span><b>${money(r.revenue)}</b></li>
+      <li><span>Ventas${st.profile.ivaResponsable ? ' sin IVA' : ''}${r.ivaSales ? ` <small class="muted">(IVA cobrado ${money(r.ivaSales)}, es de la DIAN)</small>` : ''}</span><b>${money(r.revenue)}</b></li>
       <li class="minus"><span>Costo de los productos vendidos${r.estimatedLines ? ` <small class="muted">(${r.estimatedLines} con costo actual)</small>` : ''}</span><b>− ${money(r.cogs)}</b></li>
       ${r.shippingCost ? `<li class="minus"><span>Domicilios pagados</span><b>− ${money(r.shippingCost)}</b></li>` : ''}
       <li class="sub"><span>Utilidad bruta</span>${signed(r.gross)}</li>
@@ -71,10 +74,11 @@ export function renderResumen(params) {
       <li class="total"><span>${r.profit < 0 ? 'Pérdida' : 'Utilidad'} del mes</span>${signed(r.profit)}</li>
       ${S().socios.map((so) => `<li class="share"><span>Le toca a ${esc(so.nombre)} (${Number(so.porcentaje)} %)</span>${signed(r.shares[so.id] || 0)}</li>`).join('')}
     </ul></section>
+  ${st.profile.ivaResponsable ? ivaCard(period) : ''}
   <div class="stats">
     ${stat('Dinero en cuentas', money(cash.cash), `${L().accounts.length} cuenta(s)`)}
     ${stat('Les deben', money(cash.receivable), `${m.debtors.length} persona(s)`, cash.receivable ? 'warn' : '')}
-    ${stat('Deben a proveedores', money(cash.payable), `${m.payables.length} compra(s)`)}
+    ${stat('Deben a proveedores', money(cash.payable), `<a href="#/pagar">${pay.count} factura(s)${pay.overdueCount ? ` · ${pay.overdueCount} vencida(s)` : ''}</a>`, pay.overdue ? 'warn' : '')}
     ${stat('Cobrado en el mes', money(m.collected), 'Pagos recibidos')}
   </div>
   <section class="panel"><div class="panel-head"><h2>Cuenta de los socios</h2><a class="btn btn-plain btn-small" href="#/socios">Ver detalle</a></div>
@@ -85,6 +89,20 @@ export function renderResumen(params) {
     <section class="panel"><h2>Últimos movimientos</h2>${journalRows(journal(S()).slice(0, 5)) || '<p class="muted small">Aún no hay gastos, aportes ni retiros.</p>'}
       <h3>Seguimientos con proveedores</h3>${follow.length ? `<ul class="simple">${follow.map((n) => `<li><a href="#/ph-proveedor/${n.supplierId}">${esc(st.suppliers.find((x) => x.id === n.supplierId)?.name || '')}</a><small>${formatDate(n.followUp)} · ${esc(n.summary.slice(0, 80))}</small></li>`).join('')}</ul>` : '<p class="muted small">Nada pendiente.</p>'}</section>
   </div>`;
+}
+
+/* ---------------- IVA ---------------- */
+function ivaCard(period) {
+  const v = ivaReport(S(), `${period}-15`);
+  const label = `${v.kind === 'bimestral' ? 'Bimestre' : 'Cuatrimestre'} ${periodLabel(v.from.slice(0, 7)).split(' ')[0]} – ${periodLabel(v.to.slice(0, 7))}`;
+  return `<section class="panel iva-card"><div class="panel-head"><h2>IVA del periodo</h2><small class="muted">${esc(label)}</small></div>
+    <ul class="pnl-rows">
+      <li><span>IVA cobrado en ventas${Object.keys(v.genByRate).length ? ` <small class="muted">(${Object.entries(v.genByRate).map(([r, x]) => `${r} %: ${money(x)}`).join(' · ')})</small>` : ''}</span><b>${money(v.generated)}</b></li>
+      <li class="minus"><span>IVA pagado en compras a proveedores</span><b>− ${money(v.fromPurchases)}</b></li>
+      <li class="minus"><span>IVA pagado en gastos</span><b>− ${money(v.fromExpenses)}</b></li>
+      <li class="total"><span>${v.balance >= 0 ? 'IVA a pagar a la DIAN (estimado)' : 'Saldo a favor (estimado)'}</span><b class="iva-due">${money(Math.abs(v.balance))}</b></li>
+    </ul>
+    <small class="muted">Es un estimado con lo registrado en el libro; la declaración la hace el contador con las facturas.</small></section>`;
 }
 
 /* ---------------- Libro ---------------- */
@@ -100,7 +118,7 @@ function journalRows(rows, { actions = false } = {}) {
     let sign = -1;
     if (kind === 'gasto') {
       title = x.description;
-      sub = `${EXPENSE_CATEGORIES[x.category] || ''} · pagó ${payerName(x.payer)}`;
+      sub = `${EXPENSE_CATEGORIES[x.category] || ''} · pagó ${payerName(x.payer)}${x.ivaPct ? ` · incluye IVA ${x.ivaPct} %` : ''}`;
     } else if (kind === 'aporte') {
       title = `${CONTRIBUTION_KINDS[x.kind]} de ${socioName(x.socioId)}`;
       sub = `Entró a ${accName(x.accountId)}`;
@@ -142,6 +160,7 @@ export function renderCaja() {
     ${v.moves.length ? `<ul class="simple kv">${v.moves.slice(0, 40).map((m) => `<li><span>${m.ref ? `<a href="${m.ref}">${esc(m.text)}</a>` : esc(m.text)}<small>${formatDate(m.date)} · ${MOVE_LABEL[m.kind]}</small></span><b class="${m.amount < 0 ? 'danger' : 'ok-text'}">${m.amount < 0 ? '−' : '+'} ${money(Math.abs(m.amount))}</b></li>`).join('')}</ul>` : '<p class="muted small">Sin movimientos.</p>'}</details>`;
   return `${head('Caja y bancos', 'Caja', '<button class="btn btn-primary" data-act="new-transfer">＋ Traslado</button>')}
   <section class="hero ph-hero">${heroDeco()}<div class="hero-top"><div><div class="hero-label">Dinero del negocio hoy</div><div class="hero-amount" data-count="${c.cash}">${money(c.cash)}</div><div class="hero-sub">Les deben <b>${money(c.receivable)}</b> · deben a proveedores <b>${money(c.payable)}</b></div></div></div></section>
+  <a class="pay-alert" href="#/pagar">${icon('calendar', { size: 18 })}<span><b>Facturas por pagar</b><small>Compras a crédito, vencimientos y abonos a proveedores</small></span>${icon('arrowRight', { size: 16 })}</a>
   <p class="muted small">Compara cada saldo con tu extracto de Nequi o del banco. Si no cuadra, revisa los movimientos o ajusta el saldo inicial de la cuenta.</p>
   ${Object.values(c.accounts).map((v) => box(v, v.account.name, `${ACCOUNT_KINDS[v.account.kind] || ''}${v.account.initial ? ` · saldo inicial ${money(v.account.initial)}` : ''} · <button class="link" data-act="edit-account" data-id="${v.account.id}">Editar</button>`)).join('')}
   ${c.unassigned.moves.length ? box(c.unassigned, 'Sin cuenta asignada', 'Pagos registrados con un medio que no corresponde a ninguna cuenta') : ''}
@@ -180,6 +199,7 @@ export function renderMas() {
   return `${head('Alegría Pet Home', 'Más')}
   <div class="tiles">
     ${tile('#/ph-productos', 'package', 'Productos y márgenes', 'Costos, precios y margen')}
+    ${tile('#/pagar', 'calendar', 'Facturas por pagar', 'Compras a crédito, vencimientos y abonos')}
     ${tile('#/ph-proveedores', 'users', 'Proveedores', 'Términos, compras y conversaciones')}
     ${tile('#/ph-perfil', 'file', 'Datos para cobrar', 'Logo, titular del RUT y cómo les pagan')}
   </div>

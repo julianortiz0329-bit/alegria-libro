@@ -99,11 +99,11 @@ export function chargeAccountPdf(s, sale) {
     { label: 'Precio unit.', w: 90, align: 'right' },
     { label: 'Subtotal', w: 110, align: 'right' },
   ];
-  y = table(pdf, y, cols, sale.lines.map((l) => [l.description, num(l.qty), money(l.unitPrice), money(Math.round(l.unitPrice * l.qty))]));
+  y = table(pdf, y, cols, sale.lines.map((l) => [l.ivaPct ? { text: l.description, sub: `IVA ${l.ivaPct} % incluido` } : l.description, num(l.qty), money(l.unitPrice), money(Math.round(l.unitPrice * l.qty))]));
 
   y = ensure(pdf, y, 140);
   const tx = W - M - 230;
-  const rows = [['Subtotal', t.subtotal], sale.discount ? ['Descuento', -sale.discount] : null, sale.shipping ? ['Domicilio', sale.shipping] : null, ['Total de la compra', t.total]].filter(Boolean);
+  const rows = [['Subtotal', t.subtotal], sale.discount ? ['Descuento', -sale.discount] : null, t.iva ? ['Valor sin IVA', t.net] : null, t.iva ? ['IVA incluido', t.iva] : null, sale.shipping ? ['Domicilio', sale.shipping] : null, ['Total de la compra', t.total]].filter(Boolean);
   const pays = sale.payments.filter((p) => p.status === 'activo');
   for (const p of pays) rows.push([`Abono ${formatDate(p.date)} (${PH_METHODS[p.method] || p.method})`, -p.amount]);
   rows.forEach(([k, v], i) => {
@@ -162,7 +162,7 @@ export function paymentReceiptPdf(s, sale, payment) {
 }
 
 /** Informe del mes para los socios: estado de resultados, reparto, cuentas y movimientos. */
-export function monthReportPdf(s, period, { monthResult, partnerBalances, accountBalances, journal, EXPENSE_CATEGORIES, periodLabel }) {
+export function monthReportPdf(s, period, { monthResult, partnerBalances, accountBalances, journal, EXPENSE_CATEGORIES, periodLabel, ivaReport }) {
   const pf = s.pethome.profile;
   const r = monthResult(s, period);
   const pdf = new PdfDoc();
@@ -181,7 +181,7 @@ export function monthReportPdf(s, period, { monthResult, partnerBalances, accoun
     y += 16;
   };
   section('Estado de resultados');
-  row('Ventas', money(r.revenue));
+  row(pf.ivaResponsable ? 'Ventas sin IVA' : 'Ventas', money(r.revenue));
   row('(−) Costo de los productos vendidos', money(r.cogs));
   if (r.shippingCost) row('(−) Domicilios pagados', money(r.shippingCost));
   row('Utilidad bruta', money(r.gross), { bold: true });
@@ -193,6 +193,15 @@ export function monthReportPdf(s, period, { monthResult, partnerBalances, accoun
   section('Reparto entre socios');
   for (const so of s.socios) row(`${so.nombre} (${Number(so.porcentaje)} %)`, money(r.shares[so.id] || 0), { bold: true });
   y += 8;
+  if (pf.ivaResponsable && ivaReport) {
+    const v = ivaReport(s, `${period}-15`);
+    section(`IVA del ${v.kind === 'bimestral' ? 'bimestre' : 'cuatrimestre'} (${formatDate(v.from)} a ${formatDate(v.to.slice(0, 8) + '28')}) · estimado`);
+    row('IVA cobrado en ventas', money(v.generated));
+    row('(−) IVA pagado en compras', money(v.fromPurchases));
+    row('(−) IVA pagado en gastos', money(v.fromExpenses));
+    row(v.balance >= 0 ? 'IVA a pagar a la DIAN' : 'Saldo a favor', money(Math.abs(v.balance)), { bold: true });
+    y += 8;
+  }
   section('Cuenta de cada socio (acumulado)');
   const bal = partnerBalances(s, `${period}-31`);
   y = table(pdf, y, [{ label: 'Socio', w: 105, bold: true }, { label: 'Aportes', w: 80, align: 'right' }, { label: 'Gastos pagados', w: 82, align: 'right' }, { label: 'Utilidad', w: 80, align: 'right' }, { label: 'Retirado', w: 76, align: 'right' }, { label: 'Saldo', w: 92, align: 'right', bold: true }],
