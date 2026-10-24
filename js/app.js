@@ -4,12 +4,14 @@ import { localDate, periodLabel } from './core/dates.js';
 import { parsePesos } from './core/money.js';
 import { accountBalances, ensureAccounts, EXPENSE_CATEGORIES, ivaReport, journal, monthResult, partnerBalances, voidMovement } from './domain/ledger.js';
 import { completeSupplierFollowUp, importShopifyOrders, importShopifyProducts, loadPetHomeCatalog, saleTotals, setPhCost, updatePhProfile, voidPhPayment, voidPhSale, voidPurchase, voidPurchasePayment } from './domain/pethome.js';
+import { clearDoneTasks, deleteTask, saveTask, setTaskDone, tasksOf } from './domain/tasks.js';
 import { normalizePhone } from './domain/whatsapp.js';
 import { getState, login, logout, openCached, renameMe, startAutoSync, subscribe, sync, syncNow } from './store/store.js';
 import { $, $$, confirmDialog, download, esc, exec, haptic, money, openModal, toast } from './ui/dom.js';
 import { accountForm, contributionForm, expenseForm, showReceipt, transferForm, withdrawalForm } from './ui/forms-ledger.js';
 import { phNoteForm, phPaymentForm, phProductForm, phPurchaseDueForm, phPurchaseForm, phPurchasePayForm, phSaleForm, phSupplierForm } from './ui/forms-pethome.js';
 import { renderCompra, renderPagar } from './ui/views-payables.js';
+import { renderTareas, taskForm } from './ui/views-tasks.js';
 import { icon } from './ui/icons.js';
 import { bindRipple, bindTilt, bounce, odometer, paintGrain, setSections, swapScreen, syncNavPill } from './ui/motion.js';
 import { chargeAccountPdf, monthReportPdf, paymentReceiptPdf } from './ui/pdf-pethome.js';
@@ -18,7 +20,7 @@ import { navigate, route, savePrefs, ui } from './ui/state.js';
 import { renderCaja, renderLibro, renderMas, renderResumen, renderSocios, syncBadge } from './ui/views-ledger.js';
 import { phLogo, phProductQuery, phProductRows, renderPhProducts, renderPhProfile, renderPhSale, renderPhSales, renderPhSupplier, renderPhSuppliers } from './ui/views-pethome.js';
 
-export const VERSION = '1.2.0';
+export const VERSION = '1.3.0';
 globalThis.ALEGRIA_VERSION = VERSION;
 const S = () => getState();
 const PH = () => S().pethome;
@@ -40,9 +42,10 @@ const FAB = [
   ['new-withdrawal', 'wallet', 'Retiro de socio'],
   ['new-transfer', 'refresh', 'Traslado entre cuentas'],
   ['ph-note', 'message', 'Conversación con proveedor'],
+  ['task-new', 'clipboard', 'Tarea pendiente'],
 ];
 const NAV_ORDER = NAV.map((x) => x[0]);
-const SECTION = { pagar: 'caja', compra: 'caja', 'ph-venta': 'ph-ventas', 'ph-proveedores': 'mas', 'ph-proveedor': 'mas', 'ph-productos': 'mas', 'ph-perfil': 'mas' };
+const SECTION = { pagar: 'caja', compra: 'caja', 'ph-venta': 'ph-ventas', 'ph-proveedores': 'mas', 'ph-proveedor': 'mas', 'ph-productos': 'mas', 'ph-perfil': 'mas', tareas: 'mas' };
 
 /* ---------------- Pintar ---------------- */
 let lastKey = '';
@@ -75,6 +78,7 @@ async function render() {
       case 'pagar': html = renderPagar(r.params); break;
       case 'compra': html = renderCompra(r.id); break;
       case 'socios': html = renderSocios(); break;
+      case 'tareas': html = renderTareas(r.params); break;
       case 'mas': html = renderMas(); break;
       default: html = renderResumen(r.params);
     }
@@ -370,6 +374,25 @@ const handlers = {
   },
   'ph-new-product': () => phProductForm(),
   'ph-edit-product': (el) => phProductForm(PH().products.find((x) => x.id === el.dataset.id)),
+  'task-new': () => taskForm(),
+  'task-edit': (el) => taskForm(tasksOf(S()).find((t) => t.id === el.dataset.id)),
+  async 'task-toggle'(el) {
+    const t = tasksOf(S()).find((x) => x.id === el.dataset.id);
+    if (!t) return;
+    const r = await exec(setTaskDone, { taskId: t.id, done: !t.done }).catch(() => null);
+    if (!r) return;
+    haptic(r.done ? [12, 40, 18] : 12);
+    toast(r.done ? 'Tarea hecha' : 'Tarea abierta otra vez', 'ok', r.done ? { action: { label: 'Deshacer', icon: 'undo', onClick: () => exec(setTaskDone, { taskId: t.id, done: false }).catch(() => {}) } } : undefined);
+  },
+  async 'task-delete'(el) {
+    if (!(await confirmDialog({ title: 'Borrar tarea', message: 'Se borra para los dos socios. Si ya la hicieron, mejor márquenla como hecha.', confirmText: 'Borrar', danger: true }))) return;
+    if (await exec(deleteTask, { taskId: el.dataset.id }, { success: 'Tarea borrada' }).catch(() => null)) el.closest('.modal-backdrop')?.querySelector('[data-close]')?.click();
+  },
+  async 'task-clear'() {
+    if (!(await confirmDialog({ title: 'Borrar las tareas hechas', message: 'Se borran para los dos socios las tareas que ya están tachadas.', confirmText: 'Borrar las hechas', danger: true }))) return;
+    const n = await exec(clearDoneTasks, {}).catch(() => null);
+    if (n) toast(`${n} tarea(s) borrada(s)`);
+  },
   'ph-logo-shopify': () => logoFromShopify(),
   'ph-logo-remove': () => exec(updatePhProfile, { logo: null }, { success: 'Logo quitado' }).catch(() => {}),
 };
@@ -464,6 +487,10 @@ document.addEventListener('submit', async (e) => {
   const fd = new FormData(f);
   if (f.dataset.form === 'ph-profile') {
     await exec(updatePhProfile, { ...Object.fromEntries(['brand', 'issuerName', 'issuerId', 'phone', 'email', 'city', 'web', 'payInfo', 'taxNote', 'minMarginPct', 'ivaPeriod'].map((k) => [k, fd.get(k)])), ivaResponsable: !!fd.get('ivaResponsable') }, { success: 'Datos guardados' }).catch(() => {});
+  } else if (f.dataset.form === 'task-quick') {
+    const text = String(fd.get('text') || '').trim();
+    if (!text) return toast('Escribe qué hay que hacer.', 'error');
+    if (await exec(saveTask, { text }, { success: 'Tarea anotada' }).catch(() => null)) $('#task-q')?.focus();
   } else if (f.dataset.form === 'rename') {
     try {
       await renameMe(fd.get('nombre'));

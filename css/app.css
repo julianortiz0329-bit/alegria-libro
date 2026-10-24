@@ -1228,3 +1228,25 @@ details.acc > ul, details.acc > p { padding: 4px 16px 12px; margin: 0; }
 @media (max-width: 520px) { .ph-line.has-iva { grid-template-columns: repeat(3, minmax(0, 1fr)) 40px; } .ph-line.has-iva .ph-l-prod { grid-column: 1 / -1; } }
 .iva-card { display: grid; gap: 6px; }
 .iva-card .iva-due { font-family: var(--font-display); font-size: 24px; }
+
+/* ---------------- Tareas ---------------- */
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.warn-text { color: var(--warning); }
+.task-quick { display: flex; gap: 8px; margin-bottom: 12px; }
+.task-quick input { flex: 1; min-width: 0; min-height: var(--tap); }
+.tasks { list-style: none; margin: 0 0 12px; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.task { display: flex; align-items: flex-start; gap: 12px; padding: 12px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); box-shadow: var(--shadow-card); }
+.tasks.compact .task { box-shadow: none; padding: 10px 0; border: 0; border-bottom: 1px solid var(--border); border-radius: 0; background: transparent; }
+.tasks.compact .task:last-child { border-bottom: 0; }
+.task.late { border-color: var(--negative); }
+.tasks.compact .task.late { border-color: var(--border); }
+.task-check { flex-shrink: 0; width: var(--tap); height: var(--tap); margin: -6px 0 -6px -4px; display: flex; align-items: center; justify-content: center; border: 0; background: transparent; padding: 0; }
+.task-check .ico, .task-check svg { width: 26px; height: 26px; padding: 4px; box-sizing: border-box; border-radius: 50%; border: 2px solid var(--fg-subtle); color: transparent; transition: background .2s, border-color .2s, color .2s, transform .2s; }
+.task.done .task-check svg, .task.done .task-check .ico { background: var(--positive); border-color: var(--positive); color: var(--surface); }
+.task-check:active svg { transform: scale(.85); }
+.task-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.task-main b { font-weight: 600; overflow-wrap: anywhere; }
+.task-main p { margin: 0; color: var(--fg-muted); font-size: 14px; white-space: pre-line; overflow-wrap: anywhere; }
+.task-main small { color: var(--fg-muted); font-size: 12.5px; }
+.task.done .task-main b, .task.done .task-main p { text-decoration: line-through; color: var(--fg-subtle); }
+.task .icon-btn { flex-shrink: 0; }

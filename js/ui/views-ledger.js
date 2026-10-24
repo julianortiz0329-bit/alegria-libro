@@ -9,6 +9,7 @@ import { icon } from './icons.js';
 import { heroDeco } from './motion.js';
 import { ui } from './state.js';
 import { phLogo } from './views-pethome.js';
+import { tasksCard } from './views-tasks.js';
 
 const S = () => getState();
 const L = () => S().ledger;
@@ -81,6 +82,7 @@ export function renderResumen(params) {
     ${stat('Deben a proveedores', money(cash.payable), `<a href="#/pagar">${pay.count} factura(s)${pay.overdueCount ? ` · ${pay.overdueCount} vencida(s)` : ''}</a>`, pay.overdue ? 'warn' : '')}
     ${stat('Cobrado en el mes', money(m.collected), 'Pagos recibidos')}
   </div>
+  ${tasksCard()}
   <section class="panel"><div class="panel-head"><h2>Cuenta de los socios</h2><a class="btn btn-plain btn-small" href="#/socios">Ver detalle</a></div>
     <ul class="simple kv">${Object.values(bal).map((b) => `<li><span>${esc(b.socio.nombre)} <small class="muted">${b.balance >= 0 ? 'el negocio le debe' : 'debe al negocio'}</small></span>${signed(Math.abs(b.balance))}</li>`).join('')}</ul></section>
   <div class="two-col">
@@ -198,6 +200,7 @@ export function renderMas() {
   const tile = (href, ic, label, sub) => `<a class="quick-tile wide" href="${href}">${icon(ic, { size: 22 })}<span><b>${label}</b><small>${sub}</small></span></a>`;
   return `${head('Alegría Pet Home', 'Más')}
   <div class="tiles">
+    ${tile('#/tareas', 'clipboard', 'Tareas', 'Lo que tienen pendiente por hacer')}
     ${tile('#/ph-productos', 'package', 'Productos y márgenes', 'Costos, precios y margen')}
     ${tile('#/pagar', 'calendar', 'Facturas por pagar', 'Compras a crédito, vencimientos y abonos')}
     ${tile('#/ph-proveedores', 'users', 'Proveedores', 'Términos, compras y conversaciones')}
