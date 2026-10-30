@@ -1250,3 +1250,140 @@ details.acc > ul, details.acc > p { padding: 4px 16px 12px; margin: 0; }
 .task-main small { color: var(--fg-muted); font-size: 12.5px; }
 .task.done .task-main b, .task.done .task-main p { text-decoration: line-through; color: var(--fg-subtle); }
 .task .icon-btn { flex-shrink: 0; }
+
+/* ===================== Estilo "Menta" (v1.4) =====================
+   Inspirado en apps de finanzas limpias: azul noche + verde menta, fondo
+   gris muy claro, tarjetas blancas redondeadas SIN bordes ni líneas, sombras
+   suaves y toda la letra en Inter. El naranja de Alegría queda como acento. */
+:root[data-palette="menta"] {
+  --font-display: var(--font-sans);
+  --bg: #f4f7fb; --surface: #ffffff; --surface-muted: #eef2f7; --border: #e2e8f0;
+  --fg: #0f172a; --fg-muted: #64748b; --fg-subtle: #94a3b8;
+  --primary: #10b981; --primary-hover: #059669; --primary-fg: #ffffff; --primary-soft: #e3f8ef;
+  --gold: #10b981; --gold-strong: #059669; --gold-soft: #e3f8ef; --ring: #10b981;
+  --positive: #059669; --positive-soft: #dcfce7; --negative: #e11d48; --negative-soft: #ffe4e6;
+  --warning: #ea7a12; --warning-soft: #fff1e3; --info: #2563eb; --info-soft: #e5eeff;
+  --hero-a: #0f172a; --hero-b: #0f172a; --hero-fg: #ffffff; --hero-accent: #34d399; --hero-accent-2: #a7f3d0;
+  --splash-a: #0f172a; --fab-a: #10b981; --fab-b: #059669; --fab-fg: #ffffff;
+  --alegria: #f97316; --alegria-deep: #ea580c; --amb: #10b981; --scope-accent: #10b981; --pethome: #10b981; --pethome-soft: #e3f8ef;
+  --radius: 20px;
+  --shadow-card: 0 1px 2px rgb(15 23 42 / .04), 0 6px 20px rgb(15 23 42 / .06);
+  --shadow-pop: 0 18px 44px rgb(15 23 42 / .18);
+}
+@media (prefers-color-scheme: dark) { :root[data-palette="menta"]:not([data-theme="light"]) {
+  --bg: #0b1120; --surface: #151d2e; --surface-muted: #1c2638; --border: #243048;
+  --fg: #f1f5f9; --fg-muted: #94a3b8; --fg-subtle: #64748b;
+  --primary: #34d399; --primary-hover: #6ee7b7; --primary-fg: #052e22; --primary-soft: #0f2e27;
+  --gold: #34d399; --gold-strong: #6ee7b7; --gold-soft: #0f2e27; --ring: #34d399;
+  --positive: #4ade80; --positive-soft: #10291c; --negative: #fb7185; --negative-soft: #331520;
+  --warning: #fdba74; --warning-soft: #33220f; --info: #93c5fd; --info-soft: #14223d;
+  --hero-a: #111a2c; --hero-b: #111a2c; --fab-a: #34d399; --fab-b: #10b981; --fab-fg: #052e22; --splash-a: #0b1120;
+  --pethome: #34d399; --pethome-soft: #0f2e27;
+  --shadow-card: 0 1px 2px rgb(0 0 0 / .35); --shadow-pop: 0 18px 44px rgb(0 0 0 / .55);
+} }
+:root[data-palette="menta"][data-theme="dark"] {
+  --bg: #0b1120; --surface: #151d2e; --surface-muted: #1c2638; --border: #243048;
+  --fg: #f1f5f9; --fg-muted: #94a3b8; --fg-subtle: #64748b;
+  --primary: #34d399; --primary-hover: #6ee7b7; --primary-fg: #052e22; --primary-soft: #0f2e27;
+  --gold: #34d399; --gold-strong: #6ee7b7; --gold-soft: #0f2e27; --ring: #34d399;
+  --positive: #4ade80; --positive-soft: #10291c; --negative: #fb7185; --negative-soft: #331520;
+  --warning: #fdba74; --warning-soft: #33220f; --info: #93c5fd; --info-soft: #14223d;
+  --hero-a: #111a2c; --hero-b: #111a2c; --fab-a: #34d399; --fab-b: #10b981; --fab-fg: #052e22; --splash-a: #0b1120;
+  --pethome: #34d399; --pethome-soft: #0f2e27;
+  --shadow-card: 0 1px 2px rgb(0 0 0 / .35); --shadow-pop: 0 18px 44px rgb(0 0 0 / .55);
+}
+
+/* Fuera el fondo con brillos y grano: fondo plano y limpio. */
+[data-palette="menta"] #ambient { display: none; }
+[data-palette="menta"] body { background: var(--bg); color: var(--fg); }
+
+/* Letra: todo Inter, títulos más firmes. */
+[data-palette="menta"] :is(h1, h2, h3, .page-head h1, .brand b, .card-title, .stat-value, .hero-amount, .acard h3, #splash .sp b, #lock .login h1) { font-family: var(--font-sans); }
+[data-palette="menta"] :is(h1, .page-head h1) { font-weight: 750; letter-spacing: -0.025em; }
+[data-palette="menta"] h2 { font-weight: 700; font-size: 16px; letter-spacing: -0.01em; }
+[data-palette="menta"] .card-title { font-weight: 700; font-size: 15px; }
+[data-palette="menta"] .stat-value { font-weight: 750; letter-spacing: -0.03em; }
+[data-palette="menta"] .eyebrow { color: var(--primary); letter-spacing: .08em; font-weight: 700; }
+
+/* Tarjetas: blancas, muy redondeadas, sin borde, solo sombra suave. */
+[data-palette="menta"] :is(.panel, .stat, .card, .quick-tile, .goal-card, .menu-tile, .line-row, .acard) { border: 0; border-radius: var(--radius); background: var(--surface); box-shadow: var(--shadow-card); }
+[data-palette="menta"] .panel { padding: 16px; }
+[data-palette="menta"] .acard::before { display: none; }
+[data-palette="menta"] .stat.warn { background: var(--warning-soft); box-shadow: none; }
+[data-palette="menta"] .stat.warn .stat-value { color: var(--warning); }
+[data-palette="menta"] .panel.highlight { background: var(--primary-soft); box-shadow: none; }
+[data-palette="menta"] :is(.card.late, .card.bill) { border-left: 0; position: relative; overflow: hidden; }
+[data-palette="menta"] :is(.card.late, .card.bill)::before { content: ''; position: absolute; left: 0; top: 14px; bottom: 14px; width: 4px; border-radius: 0 4px 4px 0; background: var(--border); }
+[data-palette="menta"] .card.late::before, [data-palette="menta"] .card.bill:is(.s-vencida, .s-hoy)::before { background: var(--negative); }
+[data-palette="menta"] .card.bill.s-pronto::before { background: var(--warning); }
+[data-palette="menta"] .card.bill.s-al_dia::before { background: var(--positive); }
+
+/* Listas tipo "estado de resultados": sin rayas, filas con aire. */
+[data-palette="menta"] .pnl-rows li { border-bottom: 0; padding: 8px 2px; }
+[data-palette="menta"] .pnl-rows li.sub { margin: 4px -8px; padding: 10px 10px; border-radius: 12px; background: var(--surface-muted); }
+[data-palette="menta"] .pnl-rows li.total { border-top: 0; margin: 8px -8px 2px; padding: 12px 10px; border-radius: 14px; background: var(--primary-soft); color: var(--fg); }
+[data-palette="menta"] :is(td, th) { border-color: transparent; }
+[data-palette="menta"] tr:nth-child(even) td { background: color-mix(in srgb, var(--surface-muted) 55%, transparent); }
+
+/* Tarjeta principal (hero): azul noche plano, como la tarjeta de saldo. */
+[data-palette="menta"] .hero { background: var(--hero-a); border-radius: 24px; box-shadow: 0 14px 30px rgb(15 23 42 / .22); }
+[data-palette="menta"] .hero::after, [data-palette="menta"] .hero .sheen, [data-palette="menta"] .hero .deco { display: none; }
+[data-palette="menta"] .hero-label { color: #94a3b8; letter-spacing: .06em; text-transform: none; font-size: 13px; font-weight: 600; }
+[data-palette="menta"] .hero-amount { font-weight: 750; letter-spacing: -0.03em; }
+[data-palette="menta"] .hero-sub { color: #94a3b8; }
+[data-palette="menta"] .hero-sub b { color: #fff; }
+[data-palette="menta"] .hero-chip { background: rgb(255 255 255 / .08); color: #e2e8f0; border: 0; }
+[data-palette="menta"] .hero .btn-gold, [data-palette="menta"] .hero .btn-primary { background: var(--primary); color: #fff; }
+[data-palette="menta"] .acard.t-gold { background: var(--hero-a); color: #fff; }
+
+/* Botones. */
+[data-palette="menta"] .btn { border-radius: 14px; font-weight: 650; }
+[data-palette="menta"] .btn-primary { background: var(--primary); color: var(--primary-fg); box-shadow: 0 6px 16px color-mix(in srgb, var(--primary) 28%, transparent); }
+[data-palette="menta"] .btn-gold { background: var(--primary); color: var(--primary-fg); }
+[data-palette="menta"] .btn-secondary { background: var(--primary-soft); color: var(--primary-hover); }
+[data-palette="menta"] .btn-plain { background: var(--surface-muted); border: 0; color: var(--fg); }
+[data-palette="menta"] .page-head .btn-primary { box-shadow: none; }
+
+/* Filtros y chips: pastillas suaves; la activa en verde. */
+[data-palette="menta"] :is(.tabs a, .chip, .seg span) { border: 0; background: var(--surface-muted); color: var(--fg-muted); font-weight: 600; }
+[data-palette="menta"] .tabs a.active, [data-palette="menta"] .seg input:checked + span { background: var(--primary); color: var(--primary-fg); }
+[data-palette="menta"] .chip.active { background: var(--primary-soft); color: var(--primary-hover); }
+[data-palette="menta"] .pill { font-weight: 650; }
+
+/* Íconos dentro de cuadritos de color, como en la referencia. */
+[data-palette="menta"] :is(.quick-tile, .panel h2, .fab-menu button) .ico { color: var(--primary); }
+[data-palette="menta"] .quick-tile .ico, [data-palette="menta"] .fab-menu button .ico { box-sizing: content-box; padding: 8px; border-radius: 12px; background: var(--primary-soft); width: 20px; height: 20px; }
+
+/* Barra de arriba y marca. */
+[data-palette="menta"] .topbar { background: color-mix(in srgb, var(--bg) 90%, transparent); border-bottom: 0; }
+[data-palette="menta"] .brand b { font-weight: 750; letter-spacing: -0.02em; }
+[data-palette="menta"] .icon-toggle { border: 0; background: var(--surface); box-shadow: var(--shadow-card); }
+[data-palette="menta"] .ph-logo { box-shadow: 0 0 0 1px var(--border); }
+[data-palette="menta"] .ph-logo-empty { background: var(--hero-a); }
+
+/* Menú de abajo: blanco, plano, el activo en verde. Botón + verde. */
+[data-palette="menta"] .tab-bar { background: color-mix(in srgb, var(--surface) 94%, transparent); border: 0; box-shadow: 0 -1px 0 var(--border), 0 10px 30px rgb(15 23 42 / .10); }
+[data-palette="menta"] .tab-bar a.active { color: var(--primary); }
+[data-palette="menta"] .nav-pill { background: var(--primary-soft); box-shadow: none; }
+[data-palette="menta"] .fab { background: var(--primary); color: #fff; border-radius: 50%; box-shadow: 0 10px 24px color-mix(in srgb, var(--primary) 40%, transparent); }
+[data-palette="menta"] .fab-menu button { border: 0; border-radius: 16px; }
+[data-palette="menta"] .fab-scrim { background: rgb(15 23 42 / .35); }
+
+/* Campos de formulario. */
+[data-palette="menta"] :is(input, select, textarea):not([type="checkbox"]):not([type="radio"]):not(#lk-key) { border-radius: 12px; border-color: var(--border); background: var(--surface); }
+[data-palette="menta"] :is(input, select, textarea):focus-visible { outline: 3px solid color-mix(in srgb, var(--primary) 35%, transparent); border-color: var(--primary); }
+[data-palette="menta"] .modal { border-radius: 24px 24px 0 0; }
+
+/* Pantalla de entrada y de carga. */
+[data-palette="menta"] #splash { background: var(--hero-a); }
+[data-palette="menta"] #splash .sp small, [data-palette="menta"] #lock .login > p { color: var(--hero-accent); }
+[data-palette="menta"] #lock { background: #0f172a; }
+[data-palette="menta"] #lock .login h1 { font-weight: 750; letter-spacing: -0.02em; }
+[data-palette="menta"] #lock .login input { border-radius: 14px; border-color: rgb(255 255 255 / .14); }
+[data-palette="menta"] #lock .login input:focus-visible { outline: 3px solid rgb(52 211 153 / .45); border-color: #34d399; }
+[data-palette="menta"] #lock .login .btn { background: #10b981; color: #fff; }
+[data-palette="menta"] body[data-mode="pethome"] .hero.ph-hero, [data-palette="menta"] .client-hero { background: var(--hero-a); border: 0; }
+[data-palette="menta"] :is(.simple, .rank, .timeline) li { border-bottom: 0; }
+[data-palette="menta"] :is(.simple, .rank, .timeline) li + li { box-shadow: 0 -1px 0 color-mix(in srgb, var(--border) 60%, transparent); }
+[data-palette="menta"] :is(fieldset.sub, .sub, .import-bar) { border: 0; background: var(--surface-muted); }
+[data-palette="menta"] .pnl-rows li.total { border-top: 0; }
