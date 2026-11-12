@@ -38,8 +38,12 @@ export async function rpc(fn, args, { timeout = 20000 } = {}) {
     body = text;
   }
   if (!res.ok) {
+    const isRateLimit = body?.message && (body.message.includes('intentos') || body.message.includes('Espera'));
     const auth = body?.code === '28000';
-    throw new RemoteError(auth ? 'La clave no es válida o fue desactivada.' : body?.message || `Error ${res.status} de la nube.`, { auth });
+    const message = isRateLimit
+      ? body.message
+      : (auth ? 'La clave no es válida o fue desactivada.' : (body?.message || `Error ${res.status} de la nube.`));
+    throw new RemoteError(message, { auth });
   }
   return body;
 }
